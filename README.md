@@ -13,7 +13,7 @@ The task is episodic, and in order to solve the environment, the agents must get
 
 
 ### Install
-This project requires **Python 3.5** or higher, the Reacher Collector Environment (follow the instructions to download [here](INSTRUCT$
+This project requires **Python 3.5** or higher, the Tennis Environment (follow the instructions to download [here](INSTRUCTIONS.md)) and the following Python libraries installed:
 
 - [NumPy](http://www.numpy.org/)
 - [Statsmodels]()
@@ -32,8 +32,8 @@ This will open the Jupyter Notebook software and notebook in your browser which 
 
 
 ### References
-1. Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., et al. *Continuous control with deep reinforcement lear$
-2. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., et al. *Human-level control through deep reinforc$
+1. Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., et al. *Continuous control with deep reinforcement learning*. arXiv.org, 2015.
+2. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., et al. *Human-level control through deep reinforcement learning*. Nature, 2015.
 3. ...
 
 
