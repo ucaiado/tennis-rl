@@ -1,8 +1,7 @@
-SEED: 0
 ENVS:
   Darwin: /Users/ucaiado/GIT/tennis-rl/Tennis.app
-  Linux: /home/aind2/tennis-rl/Reacher_Linux_NoVis/Tennis.x86_64
-  Windows: C:/GIT/tennis-rl/Reacher_Windows_x86_64/Tennis.exe
+  Linux: /home/aind2/tennis-rl/Tennis_Linux_NoVis/Tennis.x86_64
+  Windows: C:/GIT/tennis-rl/Tennis_Windows_x86_64/Tennis.exe
 DDPG:
   BATCH_SIZE: 200
   BUFFER_SIZE: 100000

@@ -13,6 +13,7 @@ import platform
 from unityagents import UnityEnvironment
 import os
 import yaml
+import pdb
 
 
 '''
@@ -51,7 +52,8 @@ class EnvWrapper(object):
         self.brain = env.brains[self.brain_name]
         self.action_size = self.brain.vector_action_space_size
         self.state_size = self.brain.vector_observation_space_size
-        self.num_agents = 20
+        self.state_size *= self.brain.num_stacked_vector_observations
+        self.num_agents = 2
 
     def reset(self):
         env_info = self.env.reset(train_mode=True)[self.brain_name]

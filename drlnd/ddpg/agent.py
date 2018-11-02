@@ -75,22 +75,79 @@ End help functions and variables
 '''
 
 
+class MultiAgent(object):
+    '''
+    '''
+
+    def __init__(self, state_size, action_size, nb_agents, rand_seed):
+        '''Initialize an MultiAgent object.
+
+        :param state_size: int. dimension of each state
+        :param action_size: int. dimension of each action
+        :param nb_agents: int. number of agents to use
+        :param rand_seed: int. random seed
+        '''
+        # Replay memory
+        self.memory = ReplayBuffer(action_size, BUFFER_SIZE,
+                                   BATCH_SIZE, rand_seed)
+        self.critic_local = Critic(state_size,
+                                   action_size,
+                                   nb_agents,
+                                   rand_seed).to(DEVC)
+        self.critic_target = Critic(state_size,
+                                    action_size,
+                                    nb_agents,
+                                    rand_seed).to(DEVC)
+        self.__name__ = 'MADDPG'
+        self.nb_agents = nb_agents
+        self.action_size = action_size
+        self.l_agents = [Agent(state_size,
+                               action_size,
+                               rand_seed,
+                               self.memory,
+                               self.critic_local,
+                               self.critic_target)
+                         for i in range(nb_agents)]
+
+    def step(self, states, actions, rewards, next_states, dones):
+        iter_obj = zip(self.l_agents, states, actions, rewards, next_states,
+                       dones)
+        for agent, state, action, reward, next_state, done in iter_obj:
+            agent.step(state, action, reward, next_state, done)
+
+    def act(self, states, add_noise=True):
+        na_rtn = np.zeros([self.nb_agents, self.action_size])
+        for idx, agent in enumerate(self.l_agents):
+            na_rtn[idx, :] = agent.act(states[idx], add_noise)
+        return na_rtn
+
+    def reset(self):
+        for agent in self.l_agents:
+            agent.reset()
+
+    def __len__(self):
+        return self.nb_agents
+
+    def __getitem__(self, key):
+        return self.l_agents[key]
+
+
 class Agent(object):
     '''
     Implementation of a DQN agent that interacts with and learns from the
     environment
     '''
 
-    def __init__(self, state_size, action_size, nb_agents, rand_seed):
+    def __init__(self, state_size, action_size, rand_seed, memory, critic_local, critic_target):
         '''Initialize an MetaAgent object.
 
         :param state_size: int. dimension of each state
         :param action_size: int. dimension of each action
         :param nb_agents: int. number of agents to use
-        :param seed: int. random seed
+        :param rand_seed: int. random seed
+        :param memory: ReplayBuffer object.
         '''
 
-        self.nb_agents = nb_agents
         self.action_size = action_size
         self.__name__ = 'DDPG'
 
@@ -101,28 +158,24 @@ class Agent(object):
                                           lr=LR_ACTOR)
 
         # Critic Network (w/ Target Network)
-        self.critic_local = Critic(state_size, action_size, rand_seed).to(DEVC)
-        self.critic_target = Critic(state_size, action_size, rand_seed).to(DEVC)
+        self.critic_local = critic_local
+        self.critic_target = critic_target
         # NOTE: the decay corresponds to L2 regularization
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(),
-                                           lr=LR_CRITIC,
-                                           weight_decay=WEIGHT_DECAY)
+                                           lr=LR_CRITIC)  # , weight_decay=WEIGHT_DECAY)
 
         # Noise process
-        self.noise = OUNoise((nb_agents, action_size), rand_seed)
+        self.noise = OUNoise(action_size, rand_seed)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, BUFFER_SIZE,
-                                   BATCH_SIZE, rand_seed)
+        self.memory = memory
 
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
 
-    def step(self, states, actions, rewards, next_states, dones):
-        iter_obj = zip(states, actions, rewards, next_states, dones)
-        for state, action, reward, next_state, done in iter_obj:
-            # Save experience in replay memory
-            self.memory.add(state, action, reward, next_state, done)
+    def step(self, state, action, reward, next_state, done):
+        # pdb.set_trace()
+        self.memory.add(state, action, reward, next_state, done)
 
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
@@ -168,6 +221,7 @@ class Agent(object):
         '''
         states, actions, rewards, next_states, dones = experiences
         # rewards_ = torch.clamp(rewards, min=-1., max=1.)
+        # pdb.set_trace()
         rewards_ = rewards
 
         # --------------------------- update critic ---------------------------
@@ -239,7 +293,7 @@ class OUNoise:
         x = self.state
         dx = self.theta * (self.mu - x)
         # dx += self.sigma * np.random.rand(*self.size)  # Uniform disribution
-        dx += self.sigma * np.random.randn(*self.size)  # normal distribution
+        dx += self.sigma * np.random.randn(self.size)  # normal distribution
         # dx += self.sigma * np.array([random.random() for i in range(len(x))])
         self.state = x + dx
         return self.state
