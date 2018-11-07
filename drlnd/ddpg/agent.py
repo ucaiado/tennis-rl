@@ -90,30 +90,29 @@ class MultiAgent(object):
         # Replay memory
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE,
                                    BATCH_SIZE, rand_seed)
-        self.critic_local = Critic(state_size,
-                                   action_size,
-                                   nb_agents,
-                                   rand_seed).to(DEVC)
-        self.critic_target = Critic(state_size,
-                                    action_size,
-                                    nb_agents,
-                                    rand_seed).to(DEVC)
         self.__name__ = 'MADDPG'
         self.nb_agents = nb_agents
+        self.na_idx = np.arange(self.nb_agents)
         self.action_size = action_size
+        self.act_size = action_size * nb_agents
+        self.state_size = state_size * nb_agents
         self.l_agents = [Agent(state_size,
                                action_size,
                                rand_seed,
-                               self.memory,
-                               self.critic_local,
-                               self.critic_target)
+                               self)
                          for i in range(nb_agents)]
 
     def step(self, states, actions, rewards, next_states, dones):
-        iter_obj = zip(self.l_agents, states, actions, rewards, next_states,
-                       dones)
-        for agent, state, action, reward, next_state, done in iter_obj:
-            agent.step(state, action, reward, next_state, done)
+        experience = zip(self.l_agents, states, actions, rewards, next_states,
+                         dones)
+        for i, e in enumerate(experience):
+            agent, state, action, reward, next_state, done = e
+            na_filtered = self.na_idx[self.na_idx != i]
+            others_states = states[na_filtered]
+            others_actions = actions[na_filtered]
+            others_next_states = next_states[na_filtered]
+            agent.step(state, action, reward, next_state, done, others_states,
+                       others_actions, others_next_states)
 
     def act(self, states, add_noise=True):
         na_rtn = np.zeros([self.nb_agents, self.action_size])
@@ -138,7 +137,7 @@ class Agent(object):
     environment
     '''
 
-    def __init__(self, state_size, action_size, rand_seed, memory, critic_local, critic_target):
+    def __init__(self, state_size, action_size, rand_seed, meta_agent):
         '''Initialize an MetaAgent object.
 
         :param state_size: int. dimension of each state
@@ -158,8 +157,14 @@ class Agent(object):
                                           lr=LR_ACTOR)
 
         # Critic Network (w/ Target Network)
-        self.critic_local = critic_local
-        self.critic_target = critic_target
+        self.critic_local = Critic(state_size,
+                                   action_size,
+                                   meta_agent.nb_agents,
+                                   rand_seed).to(DEVC)
+        self.critic_target = Critic(state_size,
+                                    action_size,
+                                    meta_agent.nb_agents,
+                                    rand_seed).to(DEVC)
         # NOTE: the decay corresponds to L2 regularization
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(),
                                            lr=LR_CRITIC)  # , weight_decay=WEIGHT_DECAY)
@@ -168,14 +173,15 @@ class Agent(object):
         self.noise = OUNoise(action_size, rand_seed)
 
         # Replay memory
-        self.memory = memory
+        self.memory = meta_agent.memory
 
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
 
-    def step(self, state, action, reward, next_state, done):
-        # pdb.set_trace()
-        self.memory.add(state, action, reward, next_state, done)
+    def step(self, state, action, reward, next_state, done, others_states,
+             others_actions, others_next_states):
+        self.memory.add(state, action, reward, next_state, done, others_states,
+                        others_actions, others_next_states)
 
         # Learn every UPDATE_EVERY time steps.
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
@@ -200,7 +206,6 @@ class Agent(object):
         self.actor_local.train()
         # source: Select action at = μ(st|θμ) + Nt according to the current
         # policy and exploration noise
-        # pdb.set_trace()
         if add_noise:
             actions += self.noise.sample()
         return np.clip(actions, -1, 1)
@@ -219,19 +224,26 @@ class Agent(object):
         :param experiences: Tuple[torch.Tensor]. tuple of (s, a, r, s', done)
         :param gamma: float. discount factor
         '''
-        states, actions, rewards, next_states, dones = experiences
+        (states, actions, rewards, next_states, dones, others_states,
+         others_actions, others_next_states) = experiences
         # rewards_ = torch.clamp(rewards, min=-1., max=1.)
-        # pdb.set_trace()
         rewards_ = rewards
+        all_states = torch.cat((states, others_states), dim=1).to(DEVC)
+        all_actions = torch.cat((actions, others_actions), dim=1).to(DEVC)
+        all_next_states = torch.cat((next_states, others_next_states), dim=1).to(DEVC)
 
         # --------------------------- update critic ---------------------------
         # Get predicted next-state actions and Q values from target models
-        actions_next = self.actor_target(next_states)
-        Q_targets_next = self.critic_target(next_states, actions_next)
+        l_all_next_actions = []
+        l_all_next_actions.append(self.actor_target(states))
+        l_all_next_actions.append(self.actor_target(others_states))
+        all_next_actions = torch.cat(l_all_next_actions, dim=1).to(DEVC)
+
+        Q_targets_next = self.critic_target(all_next_states, all_next_actions)
         # Compute Q targets for current states (y_i)
         Q_targets = rewards_ + (gamma * Q_targets_next * (1 - dones))
         # Compute critic loss: L = 1/N SUM{(yi − Q(si, ai|θQ))^2}
-        Q_expected = self.critic_local(states, actions)
+        Q_expected = self.critic_local(all_states, all_actions)
         critic_loss = F.mse_loss(Q_expected, Q_targets)
         # Minimize the loss
         self.critic_optimizer.zero_grad()
@@ -242,8 +254,11 @@ class Agent(object):
 
         # --------------------------- update actor ---------------------------
         # Compute actor loss: ∇θμ J ≈1/N  ∇aQ(s, a|θQ)|s=si,a=μ(si)∇θμ μ(s|θμ)
-        actions_pred = self.actor_local(states)
-        actor_loss = -self.critic_local(states, actions_pred).mean()
+        this_actions_pred = self.actor_local(states)
+        others_actions_pred = self.actor_local(others_states)
+        others_actions_pred = others_actions_pred.detach()
+        actions_pred = torch.cat((this_actions_pred, others_actions_pred), dim=1).to(DEVC)
+        actor_loss = -self.critic_local(all_states, actions_pred).mean()
         # Minimize the loss
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -315,12 +330,17 @@ class ReplayBuffer(object):
         self.batch_size = batch_size
         self.experience = namedtuple("Experience",
                                      field_names=["state", "action", "reward",
-                                                  "next_state", "done"])
+                                                  "next_state", "done",
+                                                  "others_states",
+                                                  "others_actions",
+                                                  "others_next_states"])
         self.seed = random.seed(seed)
 
-    def add(self, state, action, reward, next_state, done):
+    def add(self, state, action, reward, next_state, done, others_states,
+            others_actions, others_next_states):
         '''Add a new experience to memory.'''
-        e = self.experience(state, action, reward, next_state, done)
+        e = self.experience(state, action, reward, next_state, done,
+                            others_states, others_actions, others_next_states)
         self.memory.append(e)
 
     def sample(self):
@@ -330,7 +350,7 @@ class ReplayBuffer(object):
         states = torch.from_numpy(np.vstack([e.state for e in experiences
                                   if e is not None])).float().to(DEVC)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences
-                                   if e is not None])).long().to(DEVC)
+                                   if e is not None])).float().to(DEVC)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences
                                    if e is not None])).float().to(DEVC)
         next_states = torch.from_numpy(np.vstack([e.next_state
@@ -339,7 +359,16 @@ class ReplayBuffer(object):
         dones = torch.from_numpy(np.vstack([e.done for e in experiences
                                             if e is not None]).astype(np.uint8)).float().to(DEVC)
 
-        return (states, actions, rewards, next_states, dones)
+        others_states = torch.from_numpy(np.vstack([e.others_states for e in experiences
+                                  if e is not None])).float().to(DEVC)
+        others_actions = torch.from_numpy(np.vstack([e.others_actions for e in experiences
+                                   if e is not None])).float().to(DEVC)
+        others_next_states = torch.from_numpy(np.vstack([e.others_next_states
+                                                      for e in experiences
+                                                      if e is not None])).float().to(DEVC)
+
+        return (states, actions, rewards, next_states, dones, others_states,
+                others_actions, others_next_states)
 
     def __len__(self):
         '''Return the current size of internal memory.'''

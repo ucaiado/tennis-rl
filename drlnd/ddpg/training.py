@@ -36,7 +36,7 @@ if __name__ == '__main__':
     env = make()
 
     # from drlnd.ddpg_agent import Agent
-    episodes = 500
+    episodes = 10000
     rand_seed = 0
 
     scores = []
@@ -76,7 +76,7 @@ if __name__ == '__main__':
         s_msg = '\rEpisode {}\tAverage Score: {:.3f}\tσ: {:.3f}\tScore: {:.3f}'
         print(s_msg.format(episode, np.mean(scores_window),
                            np.std(scores_window), np.max(score)), end="")
-        if episode % 50 == 0:
+        if episode % 100 == 0:
             print(s_msg.format(episode, np.mean(scores_window),
                                np.std(scores_window), np.max(score)))
         if np.mean(scores_window) >= 0.5:

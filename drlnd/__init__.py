@@ -13,8 +13,5 @@ Created on 10/06/2018
 """
 
 from .utils.make_env import make
-from .ddpg.agent import Agent as DDPG
-from .ddpg.agent import PARAMS as DDPG_PARAMS
-from .ppo.agent import Agent as PPO
-from .ppo.agent_utils import Trajectory
-from .ppo.agent import PARAMS as PPO_PARAMS
+from .ddpg.agent import MultiAgent as MADDPG
+from .ddpg.agent import PARAMS as MADDPG_PARAMS
