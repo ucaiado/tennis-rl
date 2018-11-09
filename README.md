@@ -16,25 +16,30 @@ The task is episodic, and in order to solve the environment, the agents must get
 This project requires **Python 3.5** or higher, the Tennis Environment (follow the instructions to download [here](INSTRUCTIONS.md)) and the following Python libraries installed:
 
 - [NumPy](http://www.numpy.org/)
-- [Statsmodels]()
+- [Statsmodels](http://www.statsmodels.org/stable/index.html)
 - [Torch](https://pytorch.org)
 - [UnityAgents](https://github.com/Unity-Technologies/ml-agents)
 
 
 ### Run
-In a terminal or command window, navigate to the top-level project directory `tennis-rl/` (that contains this README) and run the fol$
+In a terminal or command window, navigate to the top-level project directory `tennis-rl/` (that contains this README) and run the following command:
 
 ```shell
-$ jupyter notebook
+$ jupyter notebook notebooks/2018-11-07-tranning-maddpg.ipynb
 ```
 
-This will open the Jupyter Notebook software and notebook in your browser which you can use to explore and reproduce the experiments t$
+This will open the Jupyter Notebook software and the main notebook in your browser which you can use to explore and reproduce the experiment that has been run to generate the result provided in the report.
 
+Additionally, if you are interested in playing with the parameters, you can navigate to the  directory `tennis-rl/drlnd/`, modify the file `config.yaml` and run the training from the `drlnd` folder executing the command below:
+
+```shell
+$ python trainning.py
+```
 
 ### References
 1. Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., et al. *Continuous control with deep reinforcement learning*. arXiv.org, 2015.
-2. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., et al. *Human-level control through deep reinforcement learning*. Nature, 2015.
-3. ...
+2. Lowe, R., WU, Y., Tamar, A., Harb, J., Abbeel, P., and Mordatch, I. *Multi- agent actor-critic for mixed cooperative-competitive environments*. 2017.
+3. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. *Proximal Policy Optimization Algorithms*. arXiv.org, 2017.
 
 
 ### License
